@@ -5,9 +5,29 @@ Rails.application.routes.draw do
   end
 
   # Resources
-  resources :mcp_servers
-  resources :skills
-  resources :shared_gems
+  resources :mcp_servers do
+    member do
+      post :connect
+      post :disconnect
+      post :refresh_capabilities
+    end
+  end
+
+  resources :skills do
+    member do
+      post :execute
+      post :register
+      post :unregister
+    end
+  end
+
+  resources :shared_gems do
+    member do
+      post :check_status
+      post :install
+      post :build
+    end
+  end
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.

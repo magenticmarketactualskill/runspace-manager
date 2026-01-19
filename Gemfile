@@ -64,3 +64,6 @@ group :test do
   gem "capybara"
   gem "selenium-webdriver"
 end
+
+# MCP Skill Client/Server gem - bidirectional MCP support with LLM integration
+gem "mcp_skill_client_server", path: "../gem/mcp_skill_client_server"
