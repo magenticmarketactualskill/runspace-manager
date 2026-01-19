@@ -1,0 +1,200 @@
+<% content_for(:title) { "Dashboard - RunSpace" } %>
+
+<div class="dashboard">
+  <header class="dashboard-header">
+    <h1>RunSpace Dashboard</h1>
+    <div class="header-actions">
+      <%= link_to "Refresh Health", refresh_health_dashboard_path, method: :post, class: "btn btn-primary", data: { turbo_method: :post } %>
+    </div>
+  </header>
+
+  <% if flash[:notice] %>
+    <div class="alert alert-success"><%= flash[:notice] %></div>
+  <% end %>
+
+  <!-- Summary Stats -->
+  <section class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon mcp-icon"></div>
+      <div class="stat-content">
+        <h3>MCP Servers</h3>
+        <div class="stat-number"><%= @stats[:mcp_servers][:total] %></div>
+        <div class="stat-details">
+          <span class="status-online"><%= @stats[:mcp_servers][:online] %> online</span>
+          <% if @stats[:mcp_servers][:offline] > 0 %>
+            <span class="status-offline"><%= @stats[:mcp_servers][:offline] %> offline</span>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon skill-icon"></div>
+      <div class="stat-content">
+        <h3>Skills</h3>
+        <div class="stat-number"><%= @stats[:skills][:total] %></div>
+        <div class="stat-details">
+          <span class="status-online"><%= @stats[:skills][:available] %> available</span>
+          <% if @stats[:skills][:with_errors] > 0 %>
+            <span class="status-error"><%= @stats[:skills][:with_errors] %> errors</span>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon gem-icon"></div>
+      <div class="stat-content">
+        <h3>Gems</h3>
+        <div class="stat-number"><%= @stats[:gems][:total] %></div>
+        <div class="stat-details">
+          <span class="status-online"><%= @stats[:gems][:installed] %> installed</span>
+          <% if @stats[:gems][:outdated] > 0 %>
+            <span class="status-warning"><%= @stats[:gems][:outdated] %> outdated</span>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MCP Servers Section -->
+  <section class="dashboard-section">
+    <h2>MCP Servers</h2>
+    <% if @mcp_servers.any? %>
+      <div class="card-grid">
+        <% @mcp_servers.each do |server| %>
+          <div class="status-card">
+            <div class="card-header">
+              <span class="status-indicator status-<%= server.status_color %>"></span>
+              <h3><%= server.name %></h3>
+            </div>
+            <div class="card-body">
+              <% if server.description.present? %>
+                <p class="description"><%= truncate(server.description, length: 100) %></p>
+              <% end %>
+              <div class="card-meta">
+                <span class="meta-item">
+                  <strong>Port:</strong> <%= server.port || "N/A" %>
+                </span>
+                <span class="meta-item">
+                  <strong>Skills:</strong> <%= server.skill_count %>
+                </span>
+                <span class="meta-item">
+                  <strong>Status:</strong>
+                  <span class="badge badge-<%= server.status_color %>"><%= server.status.titleize %></span>
+                </span>
+              </div>
+              <% if server.last_health_check_at %>
+                <div class="card-footer">
+                  Last checked: <%= time_ago_in_words(server.last_health_check_at) %> ago
+                </div>
+              <% end %>
+              <% if server.last_error.present? %>
+                <div class="error-message"><%= truncate(server.last_error, length: 80) %></div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="empty-state">
+        <p>No MCP Servers configured yet.</p>
+      </div>
+    <% end %>
+  </section>
+
+  <!-- Skills Section -->
+  <section class="dashboard-section">
+    <h2>Skills</h2>
+    <% if @skills.any? %>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>MCP Server</th>
+              <th>Status</th>
+              <th>Invocations</th>
+              <th>Error Rate</th>
+              <th>Avg Latency</th>
+              <th>Last Used</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @skills.each do |skill| %>
+              <tr>
+                <td><strong><%= skill.name %></strong></td>
+                <td><%= skill.mcp_server.name %></td>
+                <td>
+                  <span class="badge badge-<%= skill.status_color %>"><%= skill.status.titleize %></span>
+                </td>
+                <td><%= number_with_delimiter(skill.invocation_count) %></td>
+                <td class="<%= skill.error_rate > 10 ? 'text-danger' : '' %>">
+                  <%= skill.error_rate %>%
+                </td>
+                <td>
+                  <%= skill.average_latency_ms ? "#{skill.average_latency_ms.round(1)} ms" : "N/A" %>
+                </td>
+                <td>
+                  <%= skill.last_invoked_at ? time_ago_in_words(skill.last_invoked_at) + " ago" : "Never" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="empty-state">
+        <p>No Skills registered yet.</p>
+      </div>
+    <% end %>
+  </section>
+
+  <!-- Gems Section -->
+  <section class="dashboard-section">
+    <h2>Gems</h2>
+    <% if @gems.any? %>
+      <div class="card-grid">
+        <% @gems.each do |gem| %>
+          <div class="status-card">
+            <div class="card-header">
+              <span class="status-indicator status-<%= gem.status_color %>"></span>
+              <h3><%= gem.name %></h3>
+              <% if gem.version.present? %>
+                <span class="version-badge">v<%= gem.version %></span>
+              <% end %>
+            </div>
+            <div class="card-body">
+              <% if gem.description.present? %>
+                <p class="description"><%= truncate(gem.description, length: 100) %></p>
+              <% end %>
+              <div class="card-meta">
+                <span class="meta-item">
+                  <strong>Status:</strong>
+                  <span class="badge badge-<%= gem.status_color %>"><%= gem.status.titleize %></span>
+                </span>
+                <% if gem.dependency_count > 0 %>
+                  <span class="meta-item">
+                    <strong>Dependencies:</strong> <%= gem.dependency_count %>
+                  </span>
+                <% end %>
+              </div>
+              <% if gem.last_check_at %>
+                <div class="card-footer">
+                  Last checked: <%= time_ago_in_words(gem.last_check_at) %> ago
+                </div>
+              <% end %>
+              <% if gem.last_error.present? %>
+                <div class="error-message"><%= truncate(gem.last_error, length: 80) %></div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="empty-state">
+        <p>No Gems configured yet.</p>
+      </div>
+    <% end %>
+  </section>
+</div>

@@ -1,0 +1,11 @@
+[MCP SERVERS]
+https://github.com/magenticmarketactualskill/TypeStore.git
+https://github.com/magenticmarketactualskill/CollaborativeKanban.git
+https://github.com/magenticmarketactualskill/MagenticResources.git
+
+[GEMS]
+# Add shared gem repositories here
+
+[VSCODE]
+# VS Code workspace settings
+workspace_name = RunSpace

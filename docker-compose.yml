@@ -1,0 +1,47 @@
+services:
+  typestore:
+    build:
+      context: ./mcp_servers/TypeStore
+      dockerfile: Dockerfile
+    container_name: runspace-typestore
+    ports:
+      - "3001:80"
+    environment:
+      - RAILS_MASTER_KEY=${TYPESTORE_MASTER_KEY}
+      - RAILS_LOG_TO_STDOUT=true
+    volumes:
+      - typestore_storage:/rails/storage
+    restart: unless-stopped
+
+  collaborativekanban:
+    build:
+      context: ./mcp_servers/CollaborativeKanban
+      dockerfile: Dockerfile
+    container_name: runspace-collaborativekanban
+    ports:
+      - "3002:80"
+    environment:
+      - RAILS_MASTER_KEY=${COLLABORATIVEKANBAN_MASTER_KEY}
+      - RAILS_LOG_TO_STDOUT=true
+    volumes:
+      - collaborativekanban_storage:/rails/storage
+    restart: unless-stopped
+
+  magenticresources:
+    build:
+      context: ./mcp_servers/MagenticResources
+      dockerfile: Dockerfile
+    container_name: runspace-magenticresources
+    ports:
+      - "3003:80"
+    environment:
+      - RAILS_MASTER_KEY=${MAGENTICRESOURCES_MASTER_KEY}
+      - RAILS_LOG_TO_STDOUT=true
+    volumes:
+      - magenticresources_storage:/rails/storage
+    restart: unless-stopped
+
+volumes:
+  typestore_storage:
+  collaborativekanban_storage:
+  magenticresources_storage:

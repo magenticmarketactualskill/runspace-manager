@@ -1,0 +1,14 @@
+# Environment files with secrets
+.env
+.env.*
+
+# Ignore master keys
+config/master.key
+mcp_servers/*/config/master.key
+
+# Rails defaults
+*.log
+tmp/
+storage/
+.bundle/
+vendor/bundle/
