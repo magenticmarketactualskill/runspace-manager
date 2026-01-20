@@ -67,3 +67,9 @@ end
 
 # MCP Skill Client/Server gem - bidirectional MCP support with LLM integration
 gem "mcp_skill_client_server", path: "../gem/mcp_skill_client_server"
+
+# Entity Knowledge - Rails Engine for knowledge graph with entity extraction
+gem "entity_knowledge", git: "https://github.com/magenticmarketactualskill/entity_knowledge.git"
+
+# TaskFrame for multi-stage task lifecycle management
+gem "task-frame", git: "https://github.com/actual-skill/task-frame-ruby.git"

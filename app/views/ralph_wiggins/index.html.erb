@@ -1,0 +1,195 @@
+<% content_for(:title) { "Ralph Wiggins - RunSpace" } %>
+
+<div class="ralph-wiggins">
+  <header class="dashboard-header">
+    <h1>Ralph Wiggins</h1>
+    <p class="subtitle">Parallel Epoch Manager for Claude Code</p>
+    <div class="header-actions">
+      <%= link_to "New Epoch", new_ralph_wiggins_path, class: "btn btn-primary" %>
+      <% if @running %>
+        <%= link_to "Stop All", stop_ralph_wiggins_index_path, method: :post, class: "btn btn-danger", data: { turbo_method: :post, turbo_confirm: "Stop all running epochs?" } %>
+      <% end %>
+      <%= link_to "View Logs", logs_ralph_wiggins_index_path, class: "btn btn-secondary" %>
+    </div>
+  </header>
+
+  <% if flash[:notice] %>
+    <div class="alert alert-success"><%= flash[:notice] %></div>
+  <% end %>
+  <% if flash[:alert] %>
+    <div class="alert alert-danger"><%= flash[:alert] %></div>
+  <% end %>
+
+  <!-- Summary Stats -->
+  <section class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon epoch-icon"></div>
+      <div class="stat-content">
+        <h3>Epochs</h3>
+        <div class="stat-number"><%= @epochs.count %></div>
+        <div class="stat-details">
+          <span class="status-online"><%= @running_epochs.count %> running</span>
+          <span class="status-offline"><%= Epoch.completed.count %> completed</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Running Epochs -->
+  <section class="dashboard-section">
+    <h2>Running Epochs</h2>
+    <% if @running_epochs.any? %>
+      <div class="card-grid">
+        <% @running_epochs.each do |epoch| %>
+          <div class="status-card">
+            <div class="card-header">
+              <span class="status-indicator status-<%= epoch.status_color %>"></span>
+              <h3><%= epoch.icon %> <%= epoch.name %></h3>
+            </div>
+            <div class="card-body">
+              <div class="card-meta">
+                <span class="meta-item"><strong>PID:</strong> <%= epoch.pid %></span>
+                <span class="meta-item"><strong>Iteration:</strong> <%= epoch.iteration %></span>
+                <% if epoch.max_iterations %>
+                  <span class="meta-item"><strong>Max:</strong> <%= epoch.max_iterations %></span>
+                <% end %>
+                <span class="meta-item">
+                  <strong>Status:</strong>
+                  <span class="badge badge-<%= epoch.status_color %>"><%= epoch.status.titleize %></span>
+                </span>
+              </div>
+              <% if epoch.prompt.present? %>
+                <p class="description"><%= truncate(epoch.prompt, length: 100) %></p>
+              <% end %>
+              <div class="card-footer">
+                Started: <%= epoch.started_at&.strftime("%Y-%m-%d %H:%M") || "N/A" %>
+              </div>
+              <div class="card-actions">
+                <%= link_to "View", epoch_path(epoch.id), class: "btn btn-sm btn-secondary" %>
+                <% if epoch.status == "paused" %>
+                  <%= link_to "Resume", resume_epoch_path(epoch.id), method: :post, class: "btn btn-sm btn-primary", data: { turbo_method: :post } %>
+                <% else %>
+                  <%= link_to "Pause", pause_epoch_path(epoch.id), method: :post, class: "btn btn-sm btn-warning", data: { turbo_method: :post } %>
+                <% end %>
+                <%= link_to "Stop", stop_epoch_path(epoch.id), method: :post, class: "btn btn-sm btn-danger", data: { turbo_method: :post, turbo_confirm: "Stop this epoch?" } %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="empty-state">
+        <p>No epochs currently running.</p>
+        <%= link_to "Start a new epoch", new_ralph_wiggins_path, class: "btn btn-primary" %>
+      </div>
+    <% end %>
+  </section>
+
+  <!-- All Epochs -->
+  <section class="dashboard-section">
+    <h2>All Epochs</h2>
+    <% if @epochs.any? %>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Iteration</th>
+              <th>Started</th>
+              <th>Completed</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @epochs.each do |epoch| %>
+              <tr>
+                <td>
+                  <%= epoch.icon %>
+                  <strong><%= link_to epoch.name, epoch_path(epoch.id) %></strong>
+                  <% if epoch.needs_review? %>
+                    <span class="badge badge-yellow">Needs Review</span>
+                  <% end %>
+                </td>
+                <td>
+                  <span class="badge badge-<%= epoch.status_color %>"><%= epoch.status.titleize %></span>
+                </td>
+                <td>
+                  <%= epoch.iteration %>
+                  <% if epoch.max_iterations %>
+                    / <%= epoch.max_iterations %>
+                  <% end %>
+                </td>
+                <td><%= epoch.started_at&.strftime("%Y-%m-%d %H:%M") || "-" %></td>
+                <td><%= epoch.completed_at&.strftime("%Y-%m-%d %H:%M") || "-" %></td>
+                <td class="actions">
+                  <% if epoch.running? %>
+                    <%= link_to "Stop", stop_epoch_path(epoch.id), method: :post, class: "btn btn-sm btn-danger", data: { turbo_method: :post } %>
+                  <% elsif epoch.status == "pending" %>
+                    <%= link_to "Start", start_epoch_path(epoch.id), method: :post, class: "btn btn-sm btn-primary", data: { turbo_method: :post } %>
+                  <% elsif epoch.status == "paused" %>
+                    <%= link_to "Resume", resume_epoch_path(epoch.id), method: :post, class: "btn btn-sm btn-primary", data: { turbo_method: :post } %>
+                  <% end %>
+                  <%= link_to "Delete", epoch_path(epoch.id), method: :delete, class: "btn btn-sm btn-danger", data: { turbo_method: :delete, turbo_confirm: "Delete this epoch?" } %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="empty-state">
+        <p>No epochs created yet.</p>
+      </div>
+    <% end %>
+  </section>
+
+  <!-- Command History -->
+  <section class="dashboard-section">
+    <h2>Recent Commands</h2>
+    <% if @command_history.any? %>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Command</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @command_history.reverse.first(10).each do |entry| %>
+              <tr>
+                <td><%= entry["timestamp"] %></td>
+                <td>
+                  <span class="badge badge-<%=
+                    case entry["command"]
+                    when /start/ then "green"
+                    when /stop/ then "red"
+                    when /pause/ then "yellow"
+                    when /create/ then "blue"
+                    else "gray"
+                    end
+                  %>"><%= entry["command"] %></span>
+                </td>
+                <td>
+                  <% if entry["params"].is_a?(Hash) %>
+                    <% entry["params"].each do |key, value| %>
+                      <% next if value.nil? || value.to_s.empty? %>
+                      <span class="meta-item"><strong><%= key %>:</strong> <%= truncate(value.to_s, length: 50) %></span>
+                    <% end %>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      <%= link_to "View Full History", command_history_ralph_wiggins_index_path, class: "btn btn-secondary btn-sm" %>
+    <% else %>
+      <div class="empty-state">
+        <p>No commands recorded yet.</p>
+      </div>
+    <% end %>
+  </section>
+</div>

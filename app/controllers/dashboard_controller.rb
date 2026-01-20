@@ -3,6 +3,7 @@ class DashboardController < ApplicationController
     @mcp_servers = McpServer.includes(:skills).order(:name)
     @skills = Skill.includes(:mcp_server).order(:name)
     @gems = SharedGem.order(:name)
+    @ralph_wiggins = RalphWiggins.current
 
     @stats = {
       mcp_servers: {
@@ -21,6 +22,13 @@ class DashboardController < ApplicationController
         installed: @gems.installed.count,
         outdated: @gems.outdated.count,
         with_issues: @gems.with_issues.count
+      },
+      ralph_wiggins: {
+        running: RalphWiggins.any_running?,
+        running_count: Epoch.running.count,
+        total_epochs: Epoch.all.count,
+        status: @ralph_wiggins.state["status"],
+        iteration: @ralph_wiggins.state["iteration"] || 0
       }
     }
   end

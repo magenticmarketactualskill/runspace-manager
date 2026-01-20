@@ -3,7 +3,7 @@
 
 puts "Seeding MCP Servers..."
 
-# MCP Servers from .runspace.ini
+# MCP Servers from .runspace/code_structure.ini
 mcp_servers_data = [
   {
     name: "TypeStore",

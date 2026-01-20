@@ -1,0 +1,27 @@
+{
+  "typestore": {
+    "name": "TypeStore",
+    "container": "runspace-typestore",
+    "port": 3001,
+    "running": false,
+    "healthy": false,
+    "status": "not created"
+  },
+  "collaborativekanban": {
+    "name": "CollaborativeKanban",
+    "container": "runspace-collaborativekanban",
+    "port": 3002,
+    "running": false,
+    "healthy": false,
+    "status": "not created"
+  },
+  "magenticresources": {
+    "name": "MagenticResources",
+    "container": "runspace-magenticresources",
+    "port": 3003,
+    "running": false,
+    "healthy": false,
+    "status": "not created"
+  },
+  "updated_at": "2026-01-19T14:01:53-05:00"
+}

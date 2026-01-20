@@ -1,0 +1,188 @@
+<% content_for(:title) { "#{@epoch.name} - Ralph Wiggins" } %>
+
+<div class="ralph-wiggins">
+  <header class="dashboard-header">
+    <h1><%= @epoch.icon %> <%= @epoch.name %></h1>
+    <p class="subtitle">Epoch Details</p>
+    <div class="header-actions">
+      <% if @epoch.running? %>
+        <% if @epoch.status == "paused" %>
+          <%= link_to "Resume", resume_epoch_path(@epoch.id), method: :post, class: "btn btn-primary", data: { turbo_method: :post } %>
+        <% else %>
+          <%= link_to "Pause", pause_epoch_path(@epoch.id), method: :post, class: "btn btn-warning", data: { turbo_method: :post } %>
+        <% end %>
+        <%= link_to "Stop", stop_epoch_path(@epoch.id), method: :post, class: "btn btn-danger", data: { turbo_method: :post, turbo_confirm: "Stop this epoch?" } %>
+      <% elsif @epoch.status == "pending" %>
+        <%= link_to "Start", start_epoch_path(@epoch.id), method: :post, class: "btn btn-primary", data: { turbo_method: :post } %>
+      <% end %>
+      <%= link_to "Back", ralph_wiggins_index_path, class: "btn btn-secondary" %>
+    </div>
+  </header>
+
+  <% if flash[:notice] %>
+    <div class="alert alert-success"><%= flash[:notice] %></div>
+  <% end %>
+  <% if flash[:alert] %>
+    <div class="alert alert-danger"><%= flash[:alert] %></div>
+  <% end %>
+
+  <!-- Status Overview -->
+  <section class="dashboard-section">
+    <h2>Status</h2>
+    <div class="status-card large">
+      <div class="card-header">
+        <span class="status-indicator status-<%= @epoch.status_color %>"></span>
+        <h3><%= @epoch.status.titleize %></h3>
+      </div>
+      <div class="card-body">
+        <div class="status-grid">
+          <div class="status-item">
+            <span class="label">ID</span>
+            <span class="value"><code><%= @epoch.id %></code></span>
+          </div>
+          <div class="status-item">
+            <span class="label">Entity Type</span>
+            <span class="value"><%= @epoch.entity_type %></span>
+          </div>
+          <div class="status-item">
+            <span class="label">PID</span>
+            <span class="value"><%= @epoch.pid || "N/A" %></span>
+          </div>
+          <div class="status-item">
+            <span class="label">Iteration</span>
+            <span class="value"><%= @epoch.iteration %><% if @epoch.max_iterations %> / <%= @epoch.max_iterations %><% end %></span>
+          </div>
+          <div class="status-item">
+            <span class="label">Confidence</span>
+            <span class="value"><%= (@epoch.confidence * 100).round(1) %>%</span>
+          </div>
+          <div class="status-item">
+            <span class="label">Completion Marker</span>
+            <span class="value"><code><%= @epoch.completion_marker %></code></span>
+          </div>
+          <div class="status-item">
+            <span class="label">Working Directory</span>
+            <span class="value"><code><%= @epoch.working_dir %></code></span>
+          </div>
+          <div class="status-item">
+            <span class="label">Started At</span>
+            <span class="value"><%= @epoch.started_at&.strftime("%Y-%m-%d %H:%M:%S") || "N/A" %></span>
+          </div>
+          <% if @epoch.completed_at %>
+            <div class="status-item">
+              <span class="label">Completed At</span>
+              <span class="value"><%= @epoch.completed_at.strftime("%Y-%m-%d %H:%M:%S") %></span>
+            </div>
+          <% end %>
+          <% if @epoch.stopped_at %>
+            <div class="status-item">
+              <span class="label">Stopped At</span>
+              <span class="value"><%= @epoch.stopped_at.strftime("%Y-%m-%d %H:%M:%S") %></span>
+            </div>
+          <% end %>
+        </div>
+
+        <% if @epoch.last_error.present? %>
+          <div class="error-section">
+            <h4>Last Error</h4>
+            <pre class="error-content"><%= @epoch.last_error %></pre>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <!-- Prompt -->
+  <section class="dashboard-section">
+    <h2>Prompt</h2>
+    <pre class="prompt-content"><%= @epoch.prompt %></pre>
+  </section>
+
+  <!-- Facts (Entity Knowledge) -->
+  <% if @facts.any? %>
+    <section class="dashboard-section">
+      <h2>Facts</h2>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Predicate</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @facts.each do |fact| %>
+              <tr>
+                <td><%= fact["timestamp"] %></td>
+                <td><span class="badge badge-blue"><%= fact["predicate"] %></span></td>
+                <td><%= fact["object_value"] %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% end %>
+
+  <!-- Iteration Logs -->
+  <% if @iteration_logs.any? %>
+    <section class="dashboard-section">
+      <h2>Iteration Logs</h2>
+      <div class="iteration-logs">
+        <% @iteration_logs.each do |log| %>
+          <details class="log-entry">
+            <summary>
+              <strong>Iteration <%= log[:iteration] %></strong>
+              <span class="log-size">(<%= number_to_human_size(log[:size]) %>)</span>
+            </summary>
+            <pre class="log-content"><%= log[:content] %></pre>
+          </details>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <!-- Main Log -->
+  <% if @main_log.present? %>
+    <section class="dashboard-section">
+      <h2>Main Log (last 200 lines)</h2>
+      <pre class="log-output"><%= @main_log %></pre>
+    </section>
+  <% end %>
+
+  <!-- Entity Metadata -->
+  <section class="dashboard-section">
+    <h2>Entity Metadata</h2>
+    <div class="metadata-section">
+      <dl class="metadata-list">
+        <dt>All Names</dt>
+        <dd><%= @epoch.all_names.join(", ") %></dd>
+
+        <% if @epoch.aliases.any? %>
+          <dt>Aliases</dt>
+          <dd><%= @epoch.aliases.join(", ") %></dd>
+        <% end %>
+
+        <% if @epoch.external_id.present? %>
+          <dt>External ID</dt>
+          <dd><%= @epoch.external_id %></dd>
+        <% end %>
+
+        <dt>AI Extracted?</dt>
+        <dd><%= @epoch.ai_extracted? ? "Yes" : "No" %></dd>
+
+        <dt>Needs Review?</dt>
+        <dd><%= @epoch.needs_review? ? "Yes" : "No" %></dd>
+      </dl>
+    </div>
+  </section>
+
+  <!-- Danger Zone -->
+  <section class="dashboard-section danger-zone">
+    <h2>Danger Zone</h2>
+    <div class="danger-actions">
+      <%= link_to "Delete Epoch", epoch_path(@epoch.id), method: :delete, class: "btn btn-danger", data: { turbo_method: :delete, turbo_confirm: "Are you sure you want to delete this epoch? This cannot be undone." } %>
+    </div>
+  </section>
+</div>

@@ -1,0 +1,87 @@
+<% content_for(:title) { "Ralph Wiggins Status - RunSpace" } %>
+
+<div class="ralph-wiggins">
+  <header class="dashboard-header">
+    <h1>Ralph Wiggins Status</h1>
+    <div class="header-actions">
+      <% if @status[:running] %>
+        <%= link_to "Stop", stop_ralph_wiggins_index_path, method: :post, class: "btn btn-danger", data: { turbo_method: :post, turbo_confirm: "Are you sure?" } %>
+      <% else %>
+        <%= link_to "Start New Run", new_ralph_wiggins_path, class: "btn btn-primary" %>
+      <% end %>
+      <%= link_to "Back", ralph_wiggins_index_path, class: "btn btn-secondary" %>
+    </div>
+  </header>
+
+  <!-- Status Overview -->
+  <section class="dashboard-section">
+    <h2>Current State</h2>
+    <div class="status-card large">
+      <div class="card-header">
+        <span class="status-indicator status-<%= @ralph.status_color %>"></span>
+        <h3><%= @status[:running] ? "Running" : "Stopped" %></h3>
+      </div>
+      <div class="card-body">
+        <div class="status-grid">
+          <div class="status-item">
+            <span class="label">PID</span>
+            <span class="value"><%= @status[:state]["pid"] || "N/A" %></span>
+          </div>
+          <div class="status-item">
+            <span class="label">Status</span>
+            <span class="value badge badge-<%= @ralph.status_color %>"><%= @status[:state]["status"]&.titleize || "Unknown" %></span>
+          </div>
+          <div class="status-item">
+            <span class="label">Iteration</span>
+            <span class="value"><%= @status[:state]["iteration"] || 0 %></span>
+          </div>
+          <div class="status-item">
+            <span class="label">Max Iterations</span>
+            <span class="value"><%= @status[:state]["max_iterations"] || "Unlimited" %></span>
+          </div>
+          <div class="status-item">
+            <span class="label">Completion Marker</span>
+            <span class="value"><code><%= @status[:state]["completion_marker"] || "RALPH_DONE" %></code></span>
+          </div>
+          <div class="status-item">
+            <span class="label">Started At</span>
+            <span class="value"><%= @status[:state]["started_at"] || "N/A" %></span>
+          </div>
+        </div>
+
+        <% if @status[:state]["prompt"].present? %>
+          <div class="prompt-section">
+            <h4>Prompt</h4>
+            <pre class="prompt-content"><%= @status[:state]["prompt"] %></pre>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </section>
+
+  <!-- Iteration Logs -->
+  <% if @iteration_logs.any? %>
+    <section class="dashboard-section">
+      <h2>Iteration Logs</h2>
+      <div class="iteration-logs">
+        <% @iteration_logs.each do |log| %>
+          <details class="log-entry">
+            <summary>
+              <strong>Iteration <%= log[:iteration] %></strong>
+              <span class="log-size">(<%= number_to_human_size(log[:size]) %>)</span>
+            </summary>
+            <pre class="log-content"><%= log[:content] %></pre>
+          </details>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <!-- Main Log -->
+  <% if @main_log.present? %>
+    <section class="dashboard-section">
+      <h2>Main Log (last 200 lines)</h2>
+      <pre class="log-output"><%= @main_log %></pre>
+    </section>
+  <% end %>
+</div>

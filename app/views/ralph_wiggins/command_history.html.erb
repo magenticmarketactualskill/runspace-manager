@@ -1,0 +1,62 @@
+<% content_for(:title) { "Ralph Wiggins Command History - RunSpace" } %>
+
+<div class="ralph-wiggins">
+  <header class="dashboard-header">
+    <h1>Command History</h1>
+    <p class="subtitle">All Ralph Wiggins commands recorded in ~/.ralph_wiggins</p>
+    <div class="header-actions">
+      <%= link_to "Back", ralph_wiggins_index_path, class: "btn btn-secondary" %>
+    </div>
+  </header>
+
+  <section class="dashboard-section">
+    <% if @command_history.any? %>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Command</th>
+              <th>Parameters</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @command_history.reverse.each do |entry| %>
+              <tr>
+                <td class="timestamp"><%= entry["timestamp"] %></td>
+                <td>
+                  <span class="badge badge-<%=
+                    case entry["command"]
+                    when "start" then "green"
+                    when "stop" then "red"
+                    when "status" then "blue"
+                    else "gray"
+                    end
+                  %>"><%= entry["command"] %></span>
+                </td>
+                <td class="params">
+                  <% if entry["params"].is_a?(Hash) && entry["params"].any? %>
+                    <dl class="param-list">
+                      <% entry["params"].each do |key, value| %>
+                        <% next if value.nil? || value.to_s.empty? %>
+                        <dt><%= key %></dt>
+                        <dd><%= truncate(value.to_s, length: 200) %></dd>
+                      <% end %>
+                    </dl>
+                  <% else %>
+                    <span class="text-muted">-</span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="empty-state">
+        <p>No commands have been recorded yet.</p>
+        <p>Commands will appear here after you start, stop, or check the status of Ralph Wiggins.</p>
+      </div>
+    <% end %>
+  </section>
+</div>

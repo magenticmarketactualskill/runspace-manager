@@ -1,12 +1,12 @@
 namespace :runspace do
-  CONFIG_FILE = Rails.root.join(".runspace.ini")
+  CONFIG_FILE = Rails.root.join(".runspace/code_structure.ini")
 
-  desc "Clone all MCP servers from .runspace.ini"
+  desc "Clone all MCP servers from .runspace/code_structure.ini"
   task clone_servers: :environment do
     servers = parse_config_section("MCP SERVERS")
 
     if servers.empty?
-      puts "No MCP servers configured in .runspace.ini"
+      puts "No MCP servers configured in .runspace/code_structure.ini"
       exit
     end
 
@@ -17,12 +17,12 @@ namespace :runspace do
     puts "\nDone! #{servers.count} MCP server(s) processed."
   end
 
-  desc "Clone all gems from .runspace.ini"
+  desc "Clone all gems from .runspace/code_structure.ini"
   task clone_gems: :environment do
     gems = parse_config_section("GEMS")
 
     if gems.empty?
-      puts "No gems configured in .runspace.ini"
+      puts "No gems configured in .runspace/code_structure.ini"
       exit
     end
 
@@ -68,7 +68,7 @@ namespace :runspace do
   def parse_config_section(section_name)
     unless File.exist?(CONFIG_FILE)
       puts "Error: #{CONFIG_FILE} not found"
-      puts "Copy .runspace.ini.example to .runspace.ini and configure your repositories"
+      puts "Copy .runspace/code_structure.ini.example to .runspace/code_structure.ini and configure your repositories"
       exit 1
     end
 

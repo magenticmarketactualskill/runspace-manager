@@ -1,0 +1,79 @@
+<% content_for(:title) { "New Epoch - Ralph Wiggins" } %>
+
+<div class="ralph-wiggins">
+  <header class="dashboard-header">
+    <h1>Create New Epoch</h1>
+    <p class="subtitle">Configure a parallel execution context</p>
+    <div class="header-actions">
+      <%= link_to "Back to Ralph Wiggins", ralph_wiggins_index_path, class: "btn btn-secondary" %>
+    </div>
+  </header>
+
+  <% if flash[:alert] %>
+    <div class="alert alert-danger"><%= flash[:alert] %></div>
+  <% end %>
+
+  <section class="dashboard-section">
+    <div class="form-card">
+      <%= form_with url: ralph_wiggins_index_path, method: :post, local: true, class: "ralph-form" do |f| %>
+        <div class="form-group">
+          <label for="name">Epoch Name</label>
+          <input type="text" name="name" id="name" value="<%= @default_name %>" class="form-control" placeholder="Give this epoch a memorable name">
+          <p class="form-help">A name to identify this execution context.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="prompt">Prompt *</label>
+          <textarea name="prompt" id="prompt" rows="6" required class="form-control" placeholder="Enter the task you want Claude to complete autonomously..."><%= @default_prompt %></textarea>
+          <p class="form-help">The task prompt that will be sent to Claude Code on each iteration.</p>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="max_iterations">Max Iterations</label>
+            <input type="number" name="max_iterations" id="max_iterations" value="<%= @default_max_iterations %>" min="1" max="100" class="form-control">
+            <p class="form-help">Safety limit. Leave blank for unlimited (not recommended).</p>
+          </div>
+
+          <div class="form-group">
+            <label for="completion_marker">Completion Marker</label>
+            <input type="text" name="completion_marker" id="completion_marker" value="<%= @default_completion_marker %>" class="form-control">
+            <p class="form-help">Text that signals task completion. Default: RALPH_DONE</p>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="working_dir">Working Directory</label>
+          <input type="text" name="working_dir" id="working_dir" value="<%= @default_working_dir %>" class="form-control">
+          <p class="form-help">Directory where Claude Code will run.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" name="start_immediately" value="1" checked>
+            Start epoch immediately after creation
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <%= submit_tag "Create Epoch", class: "btn btn-primary btn-lg" %>
+          <%= link_to "Cancel", ralph_wiggins_index_path, class: "btn btn-secondary" %>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <section class="dashboard-section">
+    <h2>About Epochs</h2>
+    <div class="info-card">
+      <p><strong>Epochs are Entities</strong> - parallel execution contexts that can run simultaneously.</p>
+      <ul>
+        <li>Each epoch runs its own Claude Code loop independently</li>
+        <li>Multiple epochs can run in parallel on different tasks</li>
+        <li>Epochs track their own iteration count, status, and facts</li>
+        <li>Epochs can be paused, resumed, and stopped individually</li>
+      </ul>
+      <p><strong>Tip:</strong> Use descriptive names to easily identify epochs later.</p>
+    </div>
+  </section>
+</div>

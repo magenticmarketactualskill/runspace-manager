@@ -1,0 +1,46 @@
+<% content_for(:title) { "Ralph Wiggins Logs - RunSpace" } %>
+
+<div class="ralph-wiggins">
+  <header class="dashboard-header">
+    <h1>Ralph Wiggins Logs</h1>
+    <div class="header-actions">
+      <%= link_to "Back", ralph_wiggins_index_path, class: "btn btn-secondary" %>
+      <%= link_to "Refresh", logs_ralph_wiggins_index_path, class: "btn btn-primary" %>
+    </div>
+  </header>
+
+  <!-- Iteration Logs -->
+  <section class="dashboard-section">
+    <h2>Iteration Logs</h2>
+    <% if @iteration_logs.any? %>
+      <div class="iteration-logs">
+        <% @iteration_logs.each do |log| %>
+          <details class="log-entry">
+            <summary>
+              <strong>Iteration <%= log[:iteration] %></strong>
+              <span class="log-size">(<%= number_to_human_size(log[:size]) %>)</span>
+              <span class="log-path"><%= log[:path] %></span>
+            </summary>
+            <pre class="log-content"><%= log[:content] %></pre>
+          </details>
+        <% end %>
+      </div>
+    <% else %>
+      <div class="empty-state">
+        <p>No iteration logs found.</p>
+      </div>
+    <% end %>
+  </section>
+
+  <!-- Main Log -->
+  <section class="dashboard-section">
+    <h2>Main Log (last 500 lines)</h2>
+    <% if @main_log.present? %>
+      <pre class="log-output"><%= @main_log %></pre>
+    <% else %>
+      <div class="empty-state">
+        <p>No log output available.</p>
+      </div>
+    <% end %>
+  </section>
+</div>

@@ -29,7 +29,8 @@ RunSpace shares its general architecture with [CollaborativeKanban](https://gith
 RunSpace/
 ├── gem/              # Shared Ruby gems/components
 ├── mcp_servers/      # MCP server repositories
-├── .runspace.ini     # Configuration file
+├── .runspace/        # Configuration folder
+│   └── code_structure.ini  # Configuration file
 └── README.md
 ```
 
@@ -56,14 +57,15 @@ RunSpace/
 
 3. Create configuration file:
    ```bash
-   cp .runspace.ini.example .runspace.ini
+   mkdir -p .runspace
+   cp .runspace/code_structure.ini.example .runspace/code_structure.ini
    ```
 
 ## Configuration
 
-Create `.runspace.ini` in the project root to specify MCP servers and other settings.
+Create `.runspace/code_structure.ini` in the project root to specify MCP servers and other settings.
 
-### Example `.runspace.ini`
+### Example `.runspace/code_structure.ini`
 
 ```ini
 [MCP SERVERS]
