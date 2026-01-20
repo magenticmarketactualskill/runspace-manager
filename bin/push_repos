@@ -1,0 +1,603 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Push Repos - Push all changes and bump versions for changed repos
+# Usage: bin/push_repos [command] [options]
+#
+# Commands:
+#   status         Show status of all repos (default if no command)
+#   push           Push all changes and bump versions
+#
+# Options:
+#   --dry-run      Show what would be done without making changes
+#   --no-bump      Push without bumping versions
+#   --force        Force push (use with caution)
+#   --verbose      Show detailed output
+
+require "fileutils"
+require "json"
+require "optparse"
+
+class PushRepos
+  RUNSPACE_ROOT = File.expand_path("~/Documents/RunSpace")
+
+  # Version file patterns and how to bump them
+  VERSION_PATTERNS = {
+    # Ruby version.rb files: VERSION = "X.Y.Z"
+    ruby_version: {
+      glob: "**/lib/**/version.rb",
+      pattern: /VERSION\s*=\s*["'](\d+)\.(\d+)\.(\d+)["']/,
+      replacement: ->(major, minor, patch) { "VERSION = \"#{major}.#{minor}.#{patch}\"" }
+    },
+    # package.json with version field
+    package_json: {
+      file: "package.json",
+      json_key: "version"
+    },
+    # Generic VERSION file
+    version_file: {
+      file: "VERSION",
+      pattern: /^(\d+)\.(\d+)\.(\d+)$/,
+      replacement: ->(major, minor, patch) { "#{major}.#{minor}.#{patch}" }
+    }
+  }.freeze
+
+  def initialize
+    @options = {
+      dry_run: false,
+      bump: true,
+      force: false,
+      verbose: false
+    }
+    @results = []
+  end
+
+  def run(args)
+    command = parse_command(args)
+
+    case command
+    when "status"
+      run_status
+    when "push"
+      parse_push_options(args)
+      run_push
+    when "help"
+      print_usage
+    else
+      print_usage
+      exit 1
+    end
+  end
+
+  private
+
+  def parse_command(args)
+    return "status" if args.empty?
+
+    first_arg = args.first
+    if %w[status push help].include?(first_arg)
+      args.shift
+    elsif first_arg.start_with?("-")
+      # Options without command means push
+      "push"
+    else
+      first_arg
+    end
+  end
+
+  def parse_push_options(args)
+    OptionParser.new do |opts|
+      opts.banner = "Usage: push_repos push [options]"
+
+      opts.on("--dry-run", "Show what would be done without making changes") do
+        @options[:dry_run] = true
+      end
+
+      opts.on("--no-bump", "Push without bumping versions") do
+        @options[:bump] = false
+      end
+
+      opts.on("--force", "Force push (use with caution)") do
+        @options[:force] = true
+      end
+
+      opts.on("-v", "--verbose", "Show detailed output") do
+        @options[:verbose] = true
+      end
+
+      opts.on("-h", "--help", "Show this help") do
+        puts opts
+        exit
+      end
+    end.parse!(args)
+  end
+
+  def print_usage
+    puts <<~USAGE
+      Push Repos - Manage and push changes across all RunSpace repositories
+
+      Usage: push_repos [command] [options]
+
+      Commands:
+        status         Show status of all repos (default)
+        push           Push all changes and bump versions
+        help           Show this help message
+
+      Push Options:
+        --dry-run      Show what would be done without making changes
+        --no-bump      Push without bumping versions
+        --force        Force push (use with caution)
+        -v, --verbose  Show detailed output
+
+      Examples:
+        push_repos                  # Show status of all repos
+        push_repos status           # Same as above
+        push_repos push             # Push all changes and bump versions
+        push_repos push --dry-run   # Preview push without making changes
+        push_repos push --no-bump   # Push without version bumps
+    USAGE
+  end
+
+  def run_status
+    puts "=" * 60
+    puts "Repository Status"
+    puts "=" * 60
+    puts
+
+    repos = discover_repos
+    puts "Found #{repos.length} repositories\n\n"
+
+    repos.each do |repo|
+      report_repo_status(repo)
+    end
+
+    print_status_summary
+  end
+
+  def report_repo_status(repo_path)
+    repo_name = repo_path.sub("#{RUNSPACE_ROOT}/", "")
+    result = {
+      name: repo_name,
+      path: repo_path,
+      branch: nil,
+      has_remote: false,
+      uncommitted: 0,
+      unpushed: 0,
+      version: nil,
+      status: :clean
+    }
+
+    Dir.chdir(repo_path) do
+      # Get current branch
+      result[:branch] = `git rev-parse --abbrev-ref HEAD 2>&1`.strip
+
+      # Check for remote
+      result[:has_remote] = !`git remote 2>&1`.strip.empty?
+
+      # Count uncommitted changes
+      status_output = `git status --porcelain 2>&1`.strip
+      result[:uncommitted] = status_output.empty? ? 0 : status_output.lines.count
+
+      # Count unpushed commits
+      result[:unpushed] = check_unpushed_commits
+
+      # Get version if available
+      version_file = find_version_file(repo_path)
+      result[:version] = read_current_version(version_file) if version_file
+
+      # Determine overall status
+      if !result[:has_remote]
+        result[:status] = :no_remote
+      elsif result[:uncommitted] > 0 && result[:unpushed] > 0
+        result[:status] = :uncommitted_and_unpushed
+      elsif result[:uncommitted] > 0
+        result[:status] = :uncommitted
+      elsif result[:unpushed] > 0
+        result[:status] = :unpushed
+      else
+        result[:status] = :clean
+      end
+    end
+
+    @results << result
+    print_repo_status(result)
+  end
+
+  def read_current_version(version_file)
+    case version_file[:type]
+    when :ruby_version
+      content = File.read(version_file[:path])
+      if content =~ VERSION_PATTERNS[:ruby_version][:pattern]
+        "#{$1}.#{$2}.#{$3}"
+      end
+    when :package_json
+      pkg = JSON.parse(File.read(version_file[:path]))
+      pkg["version"]
+    when :version_file
+      File.read(version_file[:path]).strip
+    end
+  rescue
+    nil
+  end
+
+  def print_repo_status(result)
+    # Status indicator
+    indicator = case result[:status]
+                when :clean then "✓"
+                when :uncommitted then "●"
+                when :unpushed then "↑"
+                when :uncommitted_and_unpushed then "●↑"
+                when :no_remote then "⚠"
+                else "?"
+                end
+
+    # Color coding via status description
+    status_desc = case result[:status]
+                  when :clean then "clean"
+                  when :uncommitted then "#{result[:uncommitted]} uncommitted"
+                  when :unpushed then "#{result[:unpushed]} unpushed"
+                  when :uncommitted_and_unpushed then "#{result[:uncommitted]} uncommitted, #{result[:unpushed]} unpushed"
+                  when :no_remote then "no remote"
+                  else "unknown"
+                  end
+
+    version_str = result[:version] ? " (v#{result[:version]})" : ""
+
+    puts "#{indicator} #{result[:name]}#{version_str}"
+    puts "    Branch: #{result[:branch]} | Status: #{status_desc}"
+
+    # Show file details for uncommitted changes
+    if result[:uncommitted] > 0
+      Dir.chdir(result[:path]) do
+        changes = `git status --porcelain 2>&1`.strip.lines.first(5)
+        changes.each { |line| puts "      #{line.strip}" }
+        if result[:uncommitted] > 5
+          puts "      ... and #{result[:uncommitted] - 5} more"
+        end
+      end
+    end
+
+    puts
+  end
+
+  def print_status_summary
+    puts "=" * 60
+    puts "Summary"
+    puts "=" * 60
+
+    clean = @results.count { |r| r[:status] == :clean }
+    uncommitted = @results.count { |r| [:uncommitted, :uncommitted_and_unpushed].include?(r[:status]) }
+    unpushed = @results.count { |r| [:unpushed, :uncommitted_and_unpushed].include?(r[:status]) }
+    no_remote = @results.count { |r| r[:status] == :no_remote }
+
+    puts "Total repositories: #{@results.length}"
+    puts "  ✓ Clean: #{clean}"
+    puts "  ● Uncommitted changes: #{uncommitted}"
+    puts "  ↑ Unpushed commits: #{unpushed}"
+    puts "  ⚠ No remote: #{no_remote}" if no_remote > 0
+
+    if uncommitted > 0 || unpushed > 0
+      puts "\nRun 'push_repos push' to commit and push all changes"
+      puts "Run 'push_repos push --dry-run' to preview changes first"
+    end
+  end
+
+  def run_push
+    puts "=" * 60
+    puts "Push Repos - #{@options[:dry_run] ? 'DRY RUN' : 'Live Mode'}"
+    puts "=" * 60
+    puts
+
+    repos = discover_repos
+    puts "Found #{repos.length} repositories\n\n"
+
+    repos.each do |repo|
+      process_repo(repo)
+    end
+
+    print_push_summary
+  end
+
+  def discover_repos
+    repos = []
+
+    # Find all .git directories
+    Dir.glob("#{RUNSPACE_ROOT}/**/.git").each do |git_dir|
+      repo_path = File.dirname(git_dir)
+      # Skip if it's inside another repo's .git directory
+      next if repo_path.include?("/.git/")
+
+      repos << repo_path
+    end
+
+    repos.sort
+  end
+
+  def process_repo(repo_path)
+    repo_name = repo_path.sub("#{RUNSPACE_ROOT}/", "")
+    result = { name: repo_name, path: repo_path, actions: [], errors: [] }
+
+    puts "Processing: #{repo_name}"
+    puts "-" * 40
+
+    Dir.chdir(repo_path) do
+      # Check for uncommitted changes
+      status = `git status --porcelain 2>&1`.strip
+      has_uncommitted = !status.empty?
+
+      # Check for unpushed commits
+      unpushed = check_unpushed_commits
+      has_unpushed = unpushed > 0
+
+      # Check if repo has remote
+      has_remote = !`git remote 2>&1`.strip.empty?
+
+      verbose_log("  Uncommitted changes: #{has_uncommitted ? 'yes' : 'no'}")
+      verbose_log("  Unpushed commits: #{unpushed}")
+      verbose_log("  Has remote: #{has_remote ? 'yes' : 'no'}")
+
+      unless has_remote
+        puts "  ⚠️  No remote configured, skipping"
+        result[:actions] << "skipped (no remote)"
+        @results << result
+        puts
+        return
+      end
+
+      if !has_uncommitted && !has_unpushed
+        puts "  ✓ No changes to push"
+        result[:actions] << "no changes"
+        @results << result
+        puts
+        return
+      end
+
+      # Bump version if there are uncommitted changes and bump is enabled
+      if has_uncommitted && @options[:bump]
+        version_bumped = bump_version(repo_path, result)
+        if version_bumped
+          has_uncommitted = true # Re-check since we modified files
+        end
+      end
+
+      # Stage and commit uncommitted changes
+      if has_uncommitted
+        if @options[:dry_run]
+          puts "  [DRY RUN] Would commit changes"
+          result[:actions] << "would commit"
+        else
+          commit_changes(result)
+        end
+      end
+
+      # Push to remote
+      if @options[:dry_run]
+        puts "  [DRY RUN] Would push to remote"
+        result[:actions] << "would push"
+      else
+        push_to_remote(result)
+      end
+    end
+
+    @results << result
+    puts
+  end
+
+  def check_unpushed_commits
+    # Get current branch
+    branch = `git rev-parse --abbrev-ref HEAD 2>&1`.strip
+    return 0 if branch.empty? || branch == "HEAD"
+
+    # Check if tracking remote exists
+    tracking = `git rev-parse --abbrev-ref @{upstream} 2>&1`.strip
+    return 0 if $?.exitstatus != 0
+
+    # Count unpushed commits
+    count = `git rev-list #{tracking}..HEAD --count 2>&1`.strip.to_i
+    count
+  rescue
+    0
+  end
+
+  def bump_version(repo_path, result)
+    version_file = find_version_file(repo_path)
+    return false unless version_file
+
+    verbose_log("  Found version file: #{version_file[:type]} at #{version_file[:path]}")
+
+    case version_file[:type]
+    when :ruby_version
+      bump_ruby_version(version_file[:path], result)
+    when :package_json
+      bump_package_json(version_file[:path], result)
+    when :version_file
+      bump_version_file(version_file[:path], result)
+    else
+      false
+    end
+  end
+
+  def find_version_file(repo_path)
+    # Check for Ruby version.rb
+    ruby_versions = Dir.glob("#{repo_path}/**/lib/**/version.rb")
+    if ruby_versions.any?
+      return { type: :ruby_version, path: ruby_versions.first }
+    end
+
+    # Check for package.json with version
+    package_json = File.join(repo_path, "package.json")
+    if File.exist?(package_json)
+      begin
+        pkg = JSON.parse(File.read(package_json))
+        if pkg["version"]
+          return { type: :package_json, path: package_json }
+        end
+      rescue JSON::ParserError
+        # Not valid JSON
+      end
+    end
+
+    # Check for VERSION file
+    version_file = File.join(repo_path, "VERSION")
+    if File.exist?(version_file)
+      return { type: :version_file, path: version_file }
+    end
+
+    nil
+  end
+
+  def bump_ruby_version(path, result)
+    content = File.read(path)
+    pattern = VERSION_PATTERNS[:ruby_version][:pattern]
+
+    if content =~ pattern
+      major, minor, patch = $1.to_i, $2.to_i, $3.to_i
+      new_patch = patch + 1
+      new_version = "#{major}.#{minor}.#{new_patch}"
+
+      if @options[:dry_run]
+        puts "  [DRY RUN] Would bump version: #{major}.#{minor}.#{patch} -> #{new_version}"
+        result[:actions] << "would bump version to #{new_version}"
+      else
+        new_content = content.gsub(pattern, "VERSION = \"#{new_version}\"")
+        File.write(path, new_content)
+        puts "  📦 Bumped version: #{major}.#{minor}.#{patch} -> #{new_version}"
+        result[:actions] << "bumped version to #{new_version}"
+      end
+      true
+    else
+      verbose_log("  No version pattern found in #{path}")
+      false
+    end
+  end
+
+  def bump_package_json(path, result)
+    content = File.read(path)
+    pkg = JSON.parse(content)
+
+    return false unless pkg["version"]
+
+    version = pkg["version"]
+    parts = version.split(".")
+    return false if parts.length < 3
+
+    major, minor, patch = parts[0].to_i, parts[1].to_i, parts[2].to_i
+    new_patch = patch + 1
+    new_version = "#{major}.#{minor}.#{new_patch}"
+
+    if @options[:dry_run]
+      puts "  [DRY RUN] Would bump version: #{version} -> #{new_version}"
+      result[:actions] << "would bump version to #{new_version}"
+    else
+      pkg["version"] = new_version
+      File.write(path, JSON.pretty_generate(pkg) + "\n")
+      puts "  📦 Bumped version: #{version} -> #{new_version}"
+      result[:actions] << "bumped version to #{new_version}"
+    end
+    true
+  rescue JSON::ParserError => e
+    result[:errors] << "Failed to parse package.json: #{e.message}"
+    false
+  end
+
+  def bump_version_file(path, result)
+    content = File.read(path).strip
+    pattern = VERSION_PATTERNS[:version_file][:pattern]
+
+    if content =~ pattern
+      major, minor, patch = $1.to_i, $2.to_i, $3.to_i
+      new_patch = patch + 1
+      new_version = "#{major}.#{minor}.#{new_patch}"
+
+      if @options[:dry_run]
+        puts "  [DRY RUN] Would bump version: #{content} -> #{new_version}"
+        result[:actions] << "would bump version to #{new_version}"
+      else
+        File.write(path, new_version + "\n")
+        puts "  📦 Bumped version: #{content} -> #{new_version}"
+        result[:actions] << "bumped version to #{new_version}"
+      end
+      true
+    else
+      false
+    end
+  end
+
+  def commit_changes(result)
+    # Stage all changes
+    system("git add -A")
+
+    # Create commit message
+    timestamp = Time.now.strftime("%Y-%m-%d %H:%M")
+    message = "Auto-commit: push_repos at #{timestamp}"
+
+    output = `git commit -m "#{message}" 2>&1`
+    if $?.success?
+      puts "  ✓ Committed changes"
+      result[:actions] << "committed"
+    else
+      if output.include?("nothing to commit")
+        puts "  ✓ Nothing to commit"
+        result[:actions] << "nothing to commit"
+      else
+        puts "  ✗ Commit failed: #{output}"
+        result[:errors] << "commit failed: #{output}"
+      end
+    end
+  end
+
+  def push_to_remote(result)
+    force_flag = @options[:force] ? "--force" : ""
+    output = `git push #{force_flag} 2>&1`
+
+    if $?.success?
+      puts "  ✓ Pushed to remote"
+      result[:actions] << "pushed"
+    else
+      if output.include?("Everything up-to-date")
+        puts "  ✓ Already up to date"
+        result[:actions] << "already up to date"
+      else
+        puts "  ✗ Push failed: #{output}"
+        result[:errors] << "push failed: #{output}"
+      end
+    end
+  end
+
+  def verbose_log(message)
+    puts message if @options[:verbose]
+  end
+
+  def print_push_summary
+    puts "=" * 60
+    puts "Summary"
+    puts "=" * 60
+
+    success_count = 0
+    error_count = 0
+
+    @results.each do |result|
+      next unless result[:actions] # Skip status-only results
+
+      status = result[:errors].empty? ? "✓" : "✗"
+      puts "#{status} #{result[:name]}: #{result[:actions].join(', ')}"
+      result[:errors].each { |e| puts "    Error: #{e}" }
+
+      if result[:errors].empty?
+        success_count += 1
+      else
+        error_count += 1
+      end
+    end
+
+    puts
+    puts "Total: #{@results.length} repos, #{success_count} success, #{error_count} errors"
+
+    if @options[:dry_run]
+      puts "\n⚠️  This was a dry run. No changes were made."
+      puts "Run 'push_repos push' to apply changes."
+    end
+  end
+end
+
+PushRepos.new.run(ARGV)
